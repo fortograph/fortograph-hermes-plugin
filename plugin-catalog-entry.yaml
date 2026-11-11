@@ -21,8 +21,8 @@
 #      and runs `hermes plugins validate`).
 #
 name: fortograph
-repo: https://github.com/TODO-YOUR-USERNAME/fortograph-hermes-plugin   # TODO
-sha: TODO-FULL-40-CHARACTER-COMMIT-SHA                                 # TODO
+repo: https://github.com/fortograph/fortograph-hermes-plugin
+sha: eadfb4c143c9729f47551138d2b9d38dbd40d515
 subdir: fortograph
 description: >-
   Reversible image redaction through the Fortograph selective-encryption API:
@@ -33,7 +33,7 @@ description: >-
   https://fortograph.selectiveencryption.com) and stores the redaction
   password in the Hermes secret FORTOGRAPH_PASSWORD; pure stdlib, no
   subprocesses.
-maintainer: TODO-YOUR-USERNAME                                          # TODO
+maintainer: fortograph
 tier: community
 category: tools
 version: "1.1.0"
