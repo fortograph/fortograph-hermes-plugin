@@ -1,0 +1,48 @@
+# This is the catalog entry to submit to NousResearch/hermes-agent.
+#
+# HOW TO SUBMIT (Hermes Agent Plugin Hackathon — due 5PM EST Nov 11):
+#   1. Push this repo to GitHub (public).
+#   2. Fill in the three TODO fields below:
+#        - repo:  your public https://github.com/<you>/fortograph-hermes-plugin URL
+#        - sha:   the full 40-character commit SHA of the commit you pushed
+#                 (run: git rev-parse HEAD)
+#        - maintainer: your GitHub username
+#   3. Fork https://github.com/NousResearch/hermes-agent, create a branch,
+#      save this file as plugin-catalog/fortograph.yaml (keeping the content
+#      below, WITHOUT these comment lines), commit, and open a pull request
+#      against NousResearch/hermes-agent.
+#   4. In the PR description: say what the plugin does, which Hermes surfaces
+#      it uses (ctx.register_tool tools, config_schema, agent.secret_scope
+#      secret), and disclose that it uploads images to the remote Fortograph
+#      API at the configured base_url (default
+#      https://fortograph.selectiveencryption.com) and stores the redaction
+#      password in Hermes secrets (FORTOGRAPH_PASSWORD).
+#   5. Wait for catalog CI to go green (it clones your repo at the pinned SHA
+#      and runs `hermes plugins validate`).
+#
+name: fortograph
+repo: https://github.com/TODO-YOUR-USERNAME/fortograph-hermes-plugin   # TODO
+sha: TODO-FULL-40-CHARACTER-COMMIT-SHA                                 # TODO
+subdir: fortograph
+description: >-
+  Reversible image redaction through the Fortograph selective-encryption API:
+  fortograph_redact encrypts chosen regions into the saved image (not just a
+  black box) and fortograph_unredact restores the original with the password,
+  so Hermes can share redacted photos and recover them later. Disclosures —
+  uploads the image to the configured Fortograph server (default
+  https://fortograph.selectiveencryption.com) and stores the redaction
+  password in the Hermes secret FORTOGRAPH_PASSWORD; pure stdlib, no
+  subprocesses.
+maintainer: TODO-YOUR-USERNAME                                          # TODO
+tier: community
+category: tools
+version: "1.1.0"
+platforms: []
+capabilities:
+  provides_tools:
+    - fortograph_status
+    - fortograph_redact
+    - fortograph_unredact
+  provides_hooks: []
+  provides_middleware: []
+  requires_env: []

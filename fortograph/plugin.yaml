@@ -1,0 +1,29 @@
+name: fortograph
+version: 1.1.0
+description: Redact and restore images through a remote Fortograph selective-encryption API (thumbnail and region-only modes).
+author: fedora
+homepage: https://fortograph.selectiveencryption.com
+tags:
+  - image
+  - redaction
+  - encryption
+  - fortograph
+provides_tools:
+  - fortograph_status
+  - fortograph_redact
+  - fortograph_unredact
+config_schema:
+  base_url:
+    type: str
+    default: "https://fortograph.selectiveencryption.com"
+    label: "Fortograph base URL"
+    description: "Deployment root. The plugin auto-detects /api/image whether this is a host root or already includes /Fortograph. Use http://ubuntu:8081/Fortograph for a direct Tailscale connection."
+  timeout:
+    type: int
+    default: 120
+    label: "Request timeout (seconds)"
+  password:
+    type: secret
+    env: FORTOGRAPH_PASSWORD
+    label: "Default redaction password"
+    description: "Password used to encrypt/decrypt the redaction payload when a tool call does not supply one."
