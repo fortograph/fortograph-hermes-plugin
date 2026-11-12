@@ -1,7 +1,7 @@
 name: fortograph
-version: 1.1.0
+version: 1.1.1
 description: Redact and restore images through a remote Fortograph selective-encryption API (thumbnail and region-only modes).
-author: fedora
+author: fortograph
 homepage: https://fortograph.selectiveencryption.com
 tags:
   - image
@@ -22,8 +22,13 @@ config_schema:
     type: int
     default: 120
     label: "Request timeout (seconds)"
+  output_dir:
+    type: str
+    default: ""
+    label: "Extra output directory"
+    description: "Optional directory the tools may also write results into, in addition to the input image's own directory. Empty means results may only be written next to the input image."
   password:
     type: secret
     env: FORTOGRAPH_PASSWORD
     label: "Default redaction password"
-    description: "Password used to encrypt/decrypt the redaction payload when a tool call does not supply one."
+    description: "Password used to encrypt/decrypt the redaction payload when a tool call does not supply one. Stored in .env through Hermes's credential route; read via agent.secret_scope."

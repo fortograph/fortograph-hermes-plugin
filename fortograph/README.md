@@ -37,11 +37,12 @@ Unredaction modes: `unfortographthumbnail` (default), `unfortograph`, `unfortogr
    hermes plugins enable fortograph
    ```
 
-3. Set the default password once (or pass `password` on every call):
-
-   ```bash
-   echo 'FORTOGRAPH_PASSWORD=your-password' >> ~/.hermes/.env
-   ```
+3. Set the default password once (or pass `password` on every call). Use
+   Hermes's own secret flow — **Settings → Plugins → Fortograph → "Default
+   redaction password"** in the Desktop app, or the same masked field in the TUI.
+   Hermes stores it through its credential route as `FORTOGRAPH_PASSWORD` in
+   `.env`; the plugin reads it with `agent.secret_scope.get_secret`. Do not
+   hand-edit `.env` and do not export the password into the process environment.
 
 4. Verify:
 
@@ -64,12 +65,15 @@ through the Desktop plugin settings form.
 |---|---|---|
 | `base_url` | `https://fortograph.selectiveencryption.com` | Deployment root. The plugin auto-detects whether to call `/api/image` or `/Fortograph/api/image`. |
 | `timeout` | `120` | Request timeout in seconds. |
-| `password` | — | Stored as the `FORTOGRAPH_PASSWORD` secret in `.env`. |
+| `output_dir` | — | Optional extra directory results may be written into, besides the input image's own directory. |
+| `password` | — | `FORTOGRAPH_PASSWORD` secret, set through Hermes's credential route (Desktop settings form), never in `config.yaml`. |
 
 Environment overrides:
 
 - `FORTOGRAPH_BASE_URL` — overrides `base_url`.
-- `FORTOGRAPH_PASSWORD` — overrides the default password.
+- `FORTOGRAPH_PASSWORD` — resolved by `agent.secret_scope.get_secret` (which
+  reads the active profile's `.env`); the plugin never reads it from a bare
+  `os.environ` lookup.
 
 Examples:
 
@@ -104,6 +108,18 @@ Regions use pixel coordinates and support `rectangle`, `circle`, and `text`:
    "coordinates": {"x": 120, "y": 90, "radius": 40}}
 ]
 ```
+
+## Safety
+
+- `image_path` must be a real image (JPEG, PNG, GIF, WEBP, BMP or TIFF, checked
+  by magic bytes). Other files — an SSH key or `~/.hermes/.env`, for example —
+  are refused before anything is uploaded.
+- `output_path` may only point inside the input image's own directory or the
+  configured `output_dir`. The plugin refuses symlinks, refuses to overwrite an
+  existing non-image file, and refuses to write a server response that is not
+  itself an image.
+- The password is resolved only through Hermes's secret scope
+  (`agent.secret_scope.get_secret`), never from a bare environment read.
 
 ## Notes
 

@@ -27,6 +27,26 @@ _UNREDACTION_ACTIONS = {
     "unfortographregiononly",
 }
 
+# Image signatures accepted for upload and for writing results back. Content is
+# sniffed by magic bytes so a model-supplied path cannot exfiltrate a text file
+# (e.g. ~/.hermes/.env or an SSH key) that merely has an image-looking name.
+_IMAGE_MAGIC = (
+    b"\xff\xd8\xff",       # JPEG
+    b"\x89PNG\r\n\x1a\n",  # PNG
+    b"GIF87a",
+    b"GIF89a",
+    b"BM",                 # BMP
+    b"II*\x00",            # TIFF (little-endian)
+    b"MM\x00*",            # TIFF (big-endian)
+)
+
+
+def _is_image_header(header: bytes) -> bool:
+    if header.startswith(b"RIFF") and header[8:12] == b"WEBP":
+        return True
+    return any(header.startswith(magic) for magic in _IMAGE_MAGIC)
+
+
 _CTX = None
 _ENDPOINT_CACHE: dict[str, str] = {}
 
@@ -46,15 +66,18 @@ def _setting(key: str, default=None):
 
 
 def _secret(name: str):
+    """Resolve a secret only through Hermes's profile-scoped secret scope.
+
+    Deliberately no bare ``os.environ`` fallback: under gateway multiplexing that
+    can pick up another profile's value. ``get_secret`` already honours the
+    active profile's ``.env``/process env for single-profile deployments.
+    """
     try:
         from agent.secret_scope import get_secret
 
-        value = get_secret(name)
-        if value:
-            return value
+        return get_secret(name) or ""
     except Exception:
-        pass
-    return os.environ.get(name)
+        return ""
 
 
 def _base_url() -> str:
@@ -206,17 +229,63 @@ def _content_disposition_name(header: str) -> str:
     return os.path.basename(name)
 
 
-def _save_output(input_path: str, output_path, default_name: str, data: bytes) -> str:
+def _allowed_output_roots(input_path: str) -> list[str]:
+    """Directories a result may be written into.
+
+    The input image's own directory, plus the user-configured ``output_dir``
+    setting (never a model-supplied value).
+    """
+    roots = [os.path.realpath(os.path.dirname(os.path.abspath(input_path)))]
+    configured = _setting("output_dir")
+    if configured:
+        roots.append(os.path.realpath(os.path.expanduser(str(configured))))
+    return roots
+
+
+def _confined_output(input_path: str, output_path, default_name: str) -> str:
+    """Resolve the write target and refuse anything outside the allowed roots."""
     if output_path:
         target = os.path.expanduser(str(output_path))
         if os.path.isdir(target):
             target = os.path.join(target, default_name)
     else:
         target = os.path.join(os.path.dirname(os.path.abspath(input_path)), default_name)
-    os.makedirs(os.path.dirname(os.path.abspath(target)), exist_ok=True)
+    target = os.path.abspath(target)
+
+    target_dir = os.path.realpath(os.path.dirname(target))
+    if not any(
+        target_dir == root or target_dir.startswith(root + os.sep)
+        for root in _allowed_output_roots(input_path)
+    ):
+        raise ValueError(
+            "refusing to write outside the input image's directory or the "
+            "configured output_dir: %s" % target
+        )
+
+    if os.path.islink(target):
+        raise ValueError("refusing to write through a symlink: %s" % target)
+    if os.path.exists(target):
+        if not os.path.isfile(target):
+            raise ValueError("refusing to overwrite a non-regular file: %s" % target)
+        with open(target, "rb") as handle:
+            if not _is_image_header(handle.read(16)):
+                raise ValueError(
+                    "refusing to overwrite an existing non-image file: %s" % target
+                )
+
+    return os.path.join(target_dir, os.path.basename(target))
+
+
+def _save_output(input_path: str, output_path, default_name: str, data: bytes) -> str:
+    # Never write arbitrary server bytes to disk: the response must itself be
+    # an image (the API always answers with one).
+    if not _is_image_header(data[:16]):
+        raise ValueError("server response is not a recognized image; refusing to write it")
+    target = _confined_output(input_path, output_path, default_name)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
     with open(target, "wb") as handle:
         handle.write(data)
-    return os.path.abspath(target)
+    return target
 
 
 def _post_image(image_path: str, action: str, password: str, shapes_json) -> dict:
@@ -244,6 +313,11 @@ def _post_image(image_path: str, action: str, password: str, shapes_json) -> dic
 
     with open(path, "rb") as handle:
         file_bytes = handle.read()
+
+    if not _is_image_header(file_bytes[:16]):
+        raise ValueError(
+            "not a recognized image (JPEG/PNG/GIF/WEBP/BMP/TIFF required): %s" % path
+        )
 
     base = _base_url()
     cached = _ENDPOINT_CACHE.get(base)

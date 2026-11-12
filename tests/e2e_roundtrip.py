@@ -113,6 +113,77 @@ def main() -> int:
             )
         )
         ok &= check("missing file -> ok:false (no exception)", missing.get("ok") is False)
+
+        print("input hardening")
+        text_file = os.path.join(work, "notes.env")
+        with open(text_file, "w") as handle:
+            handle.write("SECRET_TOKEN=do-not-upload\n")
+        not_image = json.loads(
+            tools.fortograph_redact(
+                {"image_path": text_file, "password": PASSWORD, "regions": REGIONS}
+            )
+        )
+        ok &= check(
+            "non-image input refused before upload",
+            not_image.get("ok") is False
+            and "not a recognized image" in str(not_image.get("error")),
+        )
+
+        print("output confinement")
+        outside = os.path.join(tempfile.gettempdir(), "fortograph-outside.jpg")
+        escaped = json.loads(
+            tools.fortograph_redact(
+                {
+                    "image_path": image,
+                    "password": PASSWORD,
+                    "regions": REGIONS,
+                    "output_path": outside,
+                }
+            )
+        )
+        ok &= check(
+            "output_path outside input dir refused",
+            escaped.get("ok") is False
+            and "refusing to write outside" in str(escaped.get("error")),
+        )
+        ok &= check("nothing written outside", not os.path.exists(outside))
+
+        victim = os.path.join(work, "victim.txt")
+        with open(victim, "w") as handle:
+            handle.write("precious\n")
+        overwrite = json.loads(
+            tools.fortograph_redact(
+                {
+                    "image_path": image,
+                    "password": PASSWORD,
+                    "regions": REGIONS,
+                    "output_path": victim,
+                }
+            )
+        )
+        ok &= check(
+            "existing non-image file not overwritten",
+            overwrite.get("ok") is False
+            and "refusing to overwrite" in str(overwrite.get("error")),
+        )
+        ok &= check(
+            "victim file untouched",
+            open(victim).read() == "precious\n",
+        )
+
+        print("secret handling")
+        os.environ["FORTOGRAPH_PASSWORD"] = PASSWORD
+        no_password = json.loads(
+            tools.fortograph_redact(
+                {"image_path": image, "regions": REGIONS}
+            )
+        )
+        del os.environ["FORTOGRAPH_PASSWORD"]
+        ok &= check(
+            "bare FORTOGRAPH_PASSWORD env var is not used as a fallback",
+            no_password.get("ok") is False
+            and "password is required" in str(no_password.get("error")),
+        )
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
